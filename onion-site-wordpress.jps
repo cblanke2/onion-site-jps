@@ -44,16 +44,16 @@ actions:
       sed -i "s/Listen 80/Listen 8080/" /etc/apache2/ports.conf;
       sed -i "s/VirtualHost \*\:80/VirtualHost 127\.0\.0\.1\:8080/" /etc/apache2/sites-enabled/000-default.conf;
       sed -i "/\<VirtualHost 127\.0\.0\.1\:8080\>/ a REPLACEMEREPLACEME" /etc/apache2/sites-enabled/000-default.conf;
-      sed -i "s/REPLACEMEREPLACEME/\t\<Directory \/var\/www\/html\/\>\n\t\tAllowOverride All\n\t\<\/Directory\>/" /etc/apache2/sites-enabled/000-default.conf
+      sed -i "s/REPLACEMEREPLACEME/\t\<Directory \/var\/www\/html\/\>\n\t\tAllowOverride All\n\t\<\/Directory\>/" /etc/apache2/sites-enabled/000-default.conf;
       a2enmod rewrite;
       systemctl restart apache2;
       systemctl restart mariadb;
       sed -i "s/^#HiddenServiceDir \/var\/lib\/tor\/hidden_service\/$/HiddenServiceDir \/var\/lib\/tor\/hidden_service\//" /etc/tor/torrc;
       sed -i "s/^\#HiddenServicePort 80 127\.0\.0\.1:80$/HiddenServicePort 80 127\.0\.0\.1:8080/" /etc/tor/torrc;
-      printf "\nn\nY\nY\nY\nY\nY\n" | mysql_secure_installation
-      mysql -e "UPDATE mysql.user SET Password = PASSWORD('`openssl rand -base64 32`') WHERE User = 'root'";
-      mysql -e "CREATE DATABASE ${globals.db_name} DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci;";
-      mysql -e "GRANT ALL ON ${globals.db_name}.* TO '${globals.db_user}'@'localhost' IDENTIFIED BY '${globals.db_pass}';";
+      printf "\nn\nY\nY\nY\nY\nY\n" | mysql_secure_installation;
+      mysql -e "UPDATE mysql.user SET Password = PASSWORD('`openssl rand -base64 32`') WHERE User = 'root'" && echo "DB USER CREATED" || echo "DB USER CREATE FAILED";
+      mysql -e "CREATE DATABASE ${globals.db_name} DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci;" && echo "DB CREATED" || echo "DB CREATE FAILED";
+      mysql -e "GRANT ALL ON ${globals.db_name}.* TO '${globals.db_user}'@'localhost' IDENTIFIED BY '${globals.db_pass}';" && echo "PRIVILEGES GRANTED" || echo "PRIVILEGES GRANT FAILED";
       mysql -e "FLUSH PRIVILEGES";
       wget https://wordpress.org/latest.tar.gz -P /tmp;
       tar xzvf /tmp/latest.tar.gz -C /tmp;
