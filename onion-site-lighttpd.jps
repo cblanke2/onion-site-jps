@@ -1,0 +1,46 @@
+type: install
+id: onion-site-lighttpd
+name: Static Website via Tor
+
+description: 
+  text: Use lighttpd to run a static website as a Tor hidden service.
+
+nodes:
+  nodeType: centos-vps
+  nodeGroup: cp
+  cloudlets: 4
+  extip: false
+  displayName: onion_lighttpd_vps
+  diskLimit: 10
+
+onInstall: 
+  - setup
+  - geturl
+
+actions:
+  setup:
+    cmd[cp]: |-
+      yum update -y;
+      yum install epel-release -y;
+      yum install lighttpd tor -y;
+      sed -i "s/^\#server\.bind \= \"localhost\"$/server\.bind \= \"localhost\"/g" /etc/lighttpd/lighttpd.conf;
+      sed -i "s/server\.port \= 80/server\.port \= 8080/g" /etc/lighttpd/lighttpd.conf;
+      sed -i "s/server\.use\-ipv6 \= \"enable\"/server\.use\-ipv6 \= \"disable\"/g" /etc/lighttpd/lighttpd.conf;
+      sed -i "s/^#HiddenServiceDir \/var\/lib\/tor\/hidden_service\/$/HiddenServiceDir \/var\/lib\/tor\/hidden_service\//" /etc/tor/torrc;
+      sed -i "s/^\#HiddenServicePort 80 127\.0\.0\.1:80$/HiddenServicePort 80 127\.0\.0\.1:8080/" /etc/tor/torrc;
+      systemctl enable lighttpd;
+      systemctl restart lighttpd;
+      systemctl enable tor;
+      systemctl restart tor;
+      ln -s /var/www/lighttpd/ /root/webroot;
+    
+  geturl:
+    cmd[cp]: cat /var/lib/tor/hidden_service/hostname
+    setGlobals:
+      tor_url: ${response.out}
+
+success: | 
+  **Site URL**: [http://${globals.tor_url}/](http://${globals.tor_url}/)
+
+ssl: false
+skipNodeEmails: true

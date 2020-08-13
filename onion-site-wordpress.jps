@@ -1,0 +1,95 @@
+type: install
+id: onion-site-wordpress
+name: Wordpress via Tor
+
+description: 
+  text: Blog anonymously with WordPress as a Tor hidden service.
+
+nodes:
+  nodeType: debian-vps
+  nodeGroup: cp
+  cloudlets: 8
+  extip: false
+  displayName: onion_wordpress_vps
+  diskLimit: 10
+
+onInstall: 
+  - db_name
+  - db_user
+  - db_password
+  - setup
+  - geturl
+
+actions:
+  db_name:
+    cmd[cp]: openssl rand -hex 12
+    setGlobals:
+      db_name: ${response.out}
+  
+  db_user:
+    cmd[cp]: openssl rand -hex 8
+    setGlobals:
+      db_user: ${response.out}
+
+  db_password:
+    cmd[cp]: openssl rand -hex 12
+    setGlobals:
+      db_pass: ${response.out}
+
+  setup:
+    cmd[cp]: |-
+      apt -y update;
+      apt -y upgrade;
+      apt -y install apache2 php tor mariadb-server php-curl php-gd php-mbstring php-xml php-xmlrpc php-soap php-intl php-zip php-mysql;
+      sed -i "s/Listen 80/Listen 8080/" /etc/apache2/ports.conf;
+      sed -i "s/VirtualHost \*\:80/VirtualHost 127\.0\.0\.1\:8080/" /etc/apache2/sites-enabled/000-default.conf;
+      sed -i "/\<VirtualHost 127\.0\.0\.1\:8080\>/ a REPLACEMEREPLACEME" /etc/apache2/sites-enabled/000-default.conf;
+      sed -i "s/REPLACEMEREPLACEME/\t\<Directory \/var\/www\/html\/\>\n\t\tAllowOverride All\n\t\<\/Directory\>/" /etc/apache2/sites-enabled/000-default.conf
+      a2enmod rewrite;
+      systemctl restart apache2;
+      systemctl restart mariadb;
+      sed -i "s/^#HiddenServiceDir \/var\/lib\/tor\/hidden_service\/$/HiddenServiceDir \/var\/lib\/tor\/hidden_service\//" /etc/tor/torrc;
+      sed -i "s/^\#HiddenServicePort 80 127\.0\.0\.1:80$/HiddenServicePort 80 127\.0\.0\.1:8080/" /etc/tor/torrc;
+      printf "\nn\nY\nY\nY\nY\nY\n" | mysql_secure_installation
+      mysql -e "UPDATE mysql.user SET Password = PASSWORD('`openssl rand -base64 32`') WHERE User = 'root'";
+      mysql -e "CREATE DATABASE ${globals.db_name} DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci;";
+      mysql -e "GRANT ALL ON ${globals.db_name}.* TO '${globals.db_user}'@'localhost' IDENTIFIED BY '${globals.db_pass}';";
+      mysql -e "FLUSH PRIVILEGES";
+      wget https://wordpress.org/latest.tar.gz -P /tmp;
+      tar xzvf /tmp/latest.tar.gz -C /tmp;
+      touch /tmp/wordpress/.htaccess;
+      cp /tmp/wordpress/wp-config-sample.php /tmp/wordpress/wp-config.php;
+      sed -i "s/database_name_here/${globals.db_name}/" /tmp/wordpress/wp-config.php;
+      sed -i "s/username_here/${globals.db_user}/" /tmp/wordpress/wp-config.php;
+      sed -i "s/password_here/${globals.db_pass}/" /tmp/wordpress/wp-config.php;
+      sed -i "s/'AUTH_KEY',         'put your unique phrase here'/'AUTH_KEY',         '`openssl rand -hex 64`'/" /tmp/wordpress/wp-config.php;
+      sed -i "s/'SECURE_AUTH_KEY',  'put your unique phrase here'/'SECURE_AUTH_KEY',  '`openssl rand -hex 64`'/" /tmp/wordpress/wp-config.php;
+      sed -i "s/'LOGGED_IN_KEY',    'put your unique phrase here'/'LOGGED_IN_KEY',    '`openssl rand -hex 64`'/" /tmp/wordpress/wp-config.php;
+      sed -i "s/'NONCE_KEY',        'put your unique phrase here'/'NONCE_KEY',        '`openssl rand -hex 64`'/" /tmp/wordpress/wp-config.php;
+      sed -i "s/'AUTH_SALT',        'put your unique phrase here'/'AUTH_SALT',        '`openssl rand -hex 64`'/" /tmp/wordpress/wp-config.php;
+      sed -i "s/'SECURE_AUTH_SALT', 'put your unique phrase here'/'SECURE_AUTH_SALT', '`openssl rand -hex 64`'/" /tmp/wordpress/wp-config.php;
+      sed -i "s/'LOGGED_IN_SALT',   'put your unique phrase here'/'LOGGED_IN_SALT',   '`openssl rand -hex 64`'/" /tmp/wordpress/wp-config.php;
+      sed -i "s/'NONCE_SALT',       'put your unique phrase here'/'NONCE_SALT',       '`openssl rand -hex 64`'/" /tmp/wordpress/wp-config.php;
+      mkdir /tmp/wordpress/wp-content/upgrade;
+      rm /var/www/html/index.html;
+      cp -a /tmp/wordpress/. /var/www/html;
+      rm -rf /tmp/wordpress;
+      chown -R www-data:www-data /var/www/html;
+      find /var/www/html/ -type d -exec chmod 750 {} \;
+      find /var/www/html/ -type f -exec chmod 640 {} \;
+      systemctl enable apache2;
+      systemctl restart apache2;
+      systemctl enable tor;
+      systemctl restart tor;
+      ln -s /var/www/html/ /root/webroot;
+    
+  geturl:
+    cmd[cp]: cat /var/lib/tor/hidden_service/hostname
+    setGlobals:
+      tor_url: ${response.out}
+
+success: | 
+  **Site URL**: [http://${globals.tor_url}/](http://${globals.tor_url}/)
+
+ssl: false
+skipNodeEmails: true
