@@ -1,6 +1,8 @@
 type: install
-id: onion-site-wordpress
-name: Wordpress via Tor
+id: wordpress-tor-reclaim-cloud
+name: WordPress Tor Hidden Service on Reclaim Cloud
+homepage: https://gitlab.com/cblanke2/wordpress-tor-reclaim-cloud
+baseUrl: https://gitlab.com/cblanke2/wordpress-tor-reclaim-cloud/raw/master/
 
 description: 
   text: Blog anonymously with WordPress as a Tor hidden service.
